@@ -1,8 +1,12 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, EmailStr
+from typing import Optional
 
-app = FastAPI()
+from database import create_document
+
+app = FastAPI(title="Chatoria Backend", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -14,11 +18,11 @@ app.add_middleware(
 
 @app.get("/")
 def read_root():
-    return {"message": "Hello from FastAPI Backend!"}
+    return {"message": "Chatoria API is running"}
 
 @app.get("/api/hello")
 def hello():
-    return {"message": "Hello from the backend API!"}
+    return {"message": "Hello from Chatoria backend!"}
 
 @app.get("/test")
 def test_database():
@@ -63,6 +67,28 @@ def test_database():
     response["database_name"] = "✅ Set" if os.getenv("DATABASE_NAME") else "❌ Not Set"
     
     return response
+
+# Waitlist models and endpoint
+class WaitlistIn(BaseModel):
+    name: str
+    email: EmailStr
+    company: Optional[str] = None
+    use_case: Optional[str] = None
+    consent: bool = True
+    source: Optional[str] = "beta-landing"
+
+class WaitlistOut(BaseModel):
+    id: str
+    message: str
+
+@app.post("/api/waitlist", response_model=WaitlistOut)
+async def join_waitlist(payload: WaitlistIn):
+    try:
+        # Insert into "waitlist" collection
+        inserted_id = create_document("waitlist", payload.model_dump())
+        return {"id": inserted_id, "message": "Thanks for joining the Chatoria beta!"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to join waitlist: {str(e)}")
 
 
 if __name__ == "__main__":
